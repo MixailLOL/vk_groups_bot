@@ -1,27 +1,30 @@
 import bot
-import random
+import requests
+import configparser
 
 
 def main():
-    years = random.randint(2018, 2019)
-    month = str(random.randint(0, 1)) + str(random.randint(1, 2))
-    day = str(random.randint(0, 2)) + str(random.randint(1, 9))
-    flickr_url_interesting = 'https://api.flickr.com/services/rest/?method=flickr.interestingn' \
-                             'ess.getList&api_key=03593667c94923eef10be7a5eca89b13&per_page=300&' \
-                             'page=1&date=' + str(years) + '-' + str(month) + '-' + str(day) + '&' \
-                                                                                               'safe_search=1&format' \
-                                                                                               '=json' \
-                                                                                               '&nojsoncallback=1 '
-    user_id = '4xjjeqtthyqo'
-    pat = 'cd65b61ee9f94f0fbbf6a892e5549fba'
-    app_id = 'New'
-    model_id = 'general-image-recognition'
-    model_version_id = ''
-
-    pick = bot.get_pic_from_flickr(flickr_url_interesting, 10)
-    print(pick)
-    tags = bot.get_relevant_tags_from_pick(pick, pat, user_id, app_id, model_id, model_version_id)
+    config = configparser.ConfigParser()
+    config.read("settings.ini")
+    pick_url = bot.get_pic_from_flickr(config['Flickr']['interesting'], 10)
+    print(pick_url)
+    tags = ' '.join(bot.get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
+                                                    config['Clarifai']['app_id'], config['Clarifai']['model_id'],
+                                                    config['Clarifai']['model_version_id']))
     print(tags)
+    bot.download_pick(pick_url)
+    upload_url = bot.get_wall_upload_server(config['Vk']['token'], config['Vk']['group_id_test'])
+    file = {'file1': open('pictures/Cat' + '.jpg', 'rb')}
+    upload_response = requests.post(upload_url, files=file).json()
+    save_result = bot.save_r(config['Vk']['token'], config['Vk']['group_id_test'], upload_response)
+    wall_post_response = requests.get('https://api.vk.com/method/wall.post?',
+                                      params={'attachments': save_result,
+                                              'owner_id': -int(config['Vk']['group_id_test']),
+                                              'access_token': config['Vk']['token'],
+                                              'from_group': '1',
+                                              'message': str(tags),
+                                              'v': '5.101'}).json()
+    print(wall_post_response)
 
 
 if __name__ == '__main__':
