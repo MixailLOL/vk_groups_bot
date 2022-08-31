@@ -62,10 +62,11 @@ def get_relevant_tags_from_pick(pick_url, pat, user_id, app_id, model_id, model_
         raise Exception("Post model outputs failed, status: " + post_model_outputs_response.status.description)
     output = post_model_outputs_response.outputs[0]
     tags = []
-    tags_exceptions = ['no person', 'nude']
+    tags_exceptions = ['no person', 'nude', 'son', 'daughter', 'mother', 'father']
     for concept in output.data.concepts:
         if concept.name not in tags_exceptions:
             tags.append(concept.name)
+    print(tags)
     return tags
 
 
@@ -73,10 +74,7 @@ def translate_tags(text):
     translator = google_translator()
     result = translator.translate(text, lang_tgt='ru')
     char_tags = re.findall(r"«([^«»]*)»", result)
-    ru_tags = []
-    for tag in char_tags:
-        ru_tags.append('#' + tag.replace(' ', '_'))
-    return ru_tags[0: random.randint(0, 5)]
+    return char_tags[0: random.randint(1, 10)]
 
 
 def get_wall_upload_server(token, group_id):
