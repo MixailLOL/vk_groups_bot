@@ -66,14 +66,16 @@ def get_relevant_tags_from_pick(pick_url, pat, user_id, app_id, model_id, model_
     for concept in output.data.concepts:
         if concept.name not in tags_exceptions:
             tags.append(concept.name)
+    return tags
+
+
+def translate_tags(text):
     translator = google_translator()
-    result = translator.translate(tags, lang_tgt='ru')
+    result = translator.translate(text, lang_tgt='ru')
     char_tags = re.findall(r"«([^«»]*)»", result)
     ru_tags = []
     for tag in char_tags:
         ru_tags.append('#' + tag.replace(' ', '_'))
-    if not ru_tags:
-        return ["Прив", "ну я тип бот"]
     return ru_tags[0: random.randint(0, 5)]
 
 
@@ -96,3 +98,47 @@ def save_r(token, group_id, upload_response):
                                                                                           'v': '5.101'}).json()
     return ('photo' + str(save_result['response'][0]['owner_id']) + '_' + str(
         save_result['response'][0]['id']) + '&access_key=' + str(save_result['response'][0]['access_key']))
+
+
+def get_cat_pick_and_tags(config):
+    pick_url = ''
+    tags = []
+    cats = ['Cat', 'cat', 'kitten', 'Kitten', 'Cats', 'cats']
+    tags_set = set(tags)
+    cats_set = set(cats)
+    while not tags_set.intersection(cats_set):
+        pick_url = get_pic_from_flickr(config['Flickr']['cats'], 10)
+        tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
+                                           config['Clarifai']['app_id'], config['Clarifai']['model_id'],
+                                           config['Clarifai']['model_version_id'])
+        tags_set = set(tags)
+        cats_set = set(cats)
+    tags = ' '.join(translate_tags(tags))
+    return pick_url, tags
+
+
+def get_interesting_pick_and_tags(config):
+    pick_url = get_pic_from_flickr(config['Flickr']['interesting'], 10)
+    tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
+                                       config['Clarifai']['app_id'], config['Clarifai']['model_id'],
+                                       config['Clarifai']['model_version_id'])
+    tags = ' '.join(translate_tags(tags))
+    return pick_url, tags
+
+
+def post_to_group(config, group_id, tags, pick_url):
+    download_pick(pick_url)
+    upload_url = get_wall_upload_server(config['Vk']['token'], group_id)
+    upload_response = requests.post(upload_url, files={'file1': open('pictures/Cat' + '.jpg', 'rb')}).json()
+    save_result = save_r(config['Vk']['token'], config['Vk']['group_id_test'], upload_response)
+    wall_post_response = requests.get('https://api.vk.com/method/wall.post?',
+                                      params={'attachments': save_result,
+                                              'owner_id': -int(config['Vk']['group_id_test']),
+                                              'access_token': config['Vk']['token'],
+                                              'from_group': '1',
+                                              'message': str(tags),
+                                              'v': '5.101'}).json()
+    return wall_post_response
+
+
+
