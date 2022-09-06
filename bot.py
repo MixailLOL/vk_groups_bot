@@ -1,4 +1,5 @@
 import urllib
+import urllib.request
 import requests
 import random
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
@@ -6,6 +7,9 @@ from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
 from clarifai_grpc.grpc.api.status import status_code_pb2
 from google_trans_new import google_translator
 import re
+import wikipedia
+from bs4 import BeautifulSoup
+from PIL import Image
 
 
 def get_pic_from_flickr(url, size):
@@ -28,10 +32,12 @@ def get_pic_from_flickr(url, size):
 
 
 def download_pick(pic_url):
+    img_format = pic_url[len(pic_url) - 3:]
     img = urllib.request.urlopen(pic_url).read()
-    out = open('pictures/Cat' + '.jpg', 'wb')
+    out = open('pictures/Cat.' + img_format, 'wb') # vk_group_bot/pictures/Cat
     out.write(img)
     out.close()
+    return img_format
 
 
 def get_relevant_tags_from_pick(pick_url, pat, user_id, app_id, model_id, model_version_id):
@@ -66,7 +72,6 @@ def get_relevant_tags_from_pick(pick_url, pat, user_id, app_id, model_id, model_
     for concept in output.data.concepts:
         if concept.name not in tags_exceptions:
             tags.append(concept.name)
-    print(tags)
     return tags
 
 
@@ -74,7 +79,7 @@ def translate_tags(text):
     translator = google_translator()
     result = translator.translate(text, lang_tgt='ru')
     char_tags = re.findall(r"«([^«»]*)»", result)
-    return char_tags[0: random.randint(1, 10)]
+    return char_tags
 
 
 def get_wall_upload_server(token, group_id):
@@ -105,33 +110,65 @@ def get_cat_pick_and_tags(config):
     tags_set = set(tags)
     cats_set = set(cats)
     while not tags_set.intersection(cats_set):
-        pick_url = get_pic_from_flickr(config['Flickr']['cats'], 10)
+        pick_url = get_pic_from_flickr(config['Flickr']['cats'], 9)
         tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
                                            config['Clarifai']['app_id'], config['Clarifai']['model_id'],
-                                           config['Clarifai']['model_version_id'])
+                                           config['Clarifai']['model_version_id'])[0:random.randint(1, 10)]
         tags_set = set(tags)
         cats_set = set(cats)
-    tags = ' '.join(translate_tags(tags))
+
+    if random.randint(0, 1) == 1:
+        print("Переводим теги")
+        tags = translate_tags(tags)
+    tags_tags = []
+    if random.randint(0, 1) == 1:
+        print("Добавляем хештег")
+        for tag in tags:
+            tag = tag.replace(' ', '_')
+            tags_tags.append('#' + tag)
+            tags = ' '.join(tags_tags)
+        if not tags:
+            tags = 'Бот старался сделать описание, но что-то пошло не так'
+        return pick_url, tags
+    for tag in tags:
+        tags_tags.append(tag + ';')
+        tags = ' '.join(tags_tags)
     return pick_url, tags
 
 
 def get_interesting_pick_and_tags(config):
-    pick_url = get_pic_from_flickr(config['Flickr']['interesting'], 10)
+    pick_url = get_pic_from_flickr(config['Flickr']['interesting'], 9)
     tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
                                        config['Clarifai']['app_id'], config['Clarifai']['model_id'],
-                                       config['Clarifai']['model_version_id'])
-    tags = ' '.join(translate_tags(tags))
+                                       config['Clarifai']['model_version_id'])[0:random.randint(1, 10)]
+    if random.randint(0, 1) == 1:
+        print("Переводим теги")
+        tags = translate_tags(tags)
+    tags_tags = []
+    if random.randint(0, 1) == 1:
+        print("Добавляем хештег")
+        for tag in tags:
+            tag = tag.replace(' ', '_')
+            tags_tags.append('#' + tag)
+            tags = ' '.join(tags_tags)
+        if not tags:
+            tags = 'Бот старался сделать описание, но что-то пошло не так'
+        return pick_url, tags
+    for tag in tags:
+        tags_tags.append(tag + ';')
+        tags = ' '.join(tags_tags)
     return pick_url, tags
 
 
 def post_to_group(config, group_id, tags, pick_url):
     download_pick(pick_url)
+    img_format = pick_url[len(pick_url)-3:]
     upload_url = get_wall_upload_server(config['Vk']['token'], group_id)
-    upload_response = requests.post(upload_url, files={'file1': open('pictures/Cat' + '.jpg', 'rb')}).json()
-    save_result = save_r(config['Vk']['token'], config['Vk']['group_id_test'], upload_response)
+    upload_response = requests.post(upload_url, files={'file1': open('pictures/Cat.'+img_format, 'rb')}).json()
+    save_result = save_r(config['Vk']['token'], group_id, upload_response)
     wall_post_response = requests.get('https://api.vk.com/method/wall.post?',
                                       params={'attachments': save_result,
-                                              'owner_id': -int(config['Vk']['group_id_test']),
+                                              'owner_id': -int(group_id),
                                               'access_token': config['Vk']['token'],
                                               'from_group': '1',
                                               'message': str(tags),
@@ -139,4 +176,45 @@ def post_to_group(config, group_id, tags, pick_url):
     return wall_post_response
 
 
+def multiple_replace(target_str, replace_values):
+    for i, j in replace_values.items():
+        target_str = target_str.replace(i, j)
+    return target_str
 
+
+def inf_generate():
+    wikipedia.set_lang("ru")
+    content = wikipedia.random(1)
+    print('Выбран контент:', content)
+    try:
+        wiki_page = wikipedia.page(content)
+    except Exception as e:
+        print('Exception', e)
+        post_content, file_name = inf_generate()
+        return post_content, file_name
+    print("page_url: ", wiki_page.url)
+    resp = requests.get(wiki_page.url)
+    soup = BeautifulSoup(resp.text, 'lxml')
+    a_img = soup.find('a',  {'class': 'image'})
+    try:
+        img = a_img.find('img')['srcset'].split(' ')[2]
+    except(AttributeError, KeyError, IndexError):
+        print('У контента нет норм пикчи')
+        post_content, file_name = inf_generate()
+        return post_content, file_name
+    print('img_src: ', img)
+
+    img_format = download_pick('https:'+img)
+    im = Image.open('pictures/Cat.'+img_format)
+    (width, height) = im.size
+    print(width, height)
+    if(width <= 300) and (height <= 300):
+        post_content, file_name = inf_generate()
+        return post_content, file_name
+
+    post_content = wikipedia.summary(content)
+    replace_value = {' ': '_', '(': '', ')': '', '.': '', ',': '', ':': '', '-': ''}
+    content = multiple_replace(content, replace_value)
+    post_content = "#" + content + "\n" + post_content
+    post_content = post_content.split('\n', 2)
+    return post_content[0] + '\n' + post_content[1], 'https:'+img
