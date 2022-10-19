@@ -16,9 +16,9 @@ def main():
     # pick_url, tags = bot.get_cat_pick_and_tags(config)
     # response = bot.post_to_group(config, config['Vk']['group_id_test'], tags, pick_url)
     # print(pick_url, tags)
-    tag, pick_url = bot.inf_generate()
-    response = bot.post_to_group(config, config['Vk']['group_id_wiki'], tag, pick_url)
-    print(tag, pick_url)
+    pick_url, tag  = bot.get_cat_pick_and_tags(config)
+    #response = bot.post_to_group(config, config['Vk']['group_id_test'], tag, pick_url)
+    print(tag)
 
 
 if __name__ == '__main__':

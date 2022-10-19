@@ -10,6 +10,7 @@ import re
 import wikipedia
 from bs4 import BeautifulSoup
 from PIL import Image
+import os
 
 
 def get_pic_from_flickr(url, size):
@@ -72,6 +73,7 @@ def get_relevant_tags_from_pick(pick_url, pat, user_id, app_id, model_id, model_
     for concept in output.data.concepts:
         if concept.name not in tags_exceptions:
             tags.append(concept.name)
+
     return tags
 
 
@@ -113,34 +115,59 @@ def get_cat_pick_and_tags(config):
         pick_url = get_pic_from_flickr(config['Flickr']['cats'], 9)
         tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
                                            config['Clarifai']['app_id'], config['Clarifai']['model_id'],
-                                           config['Clarifai']['model_version_id'])[0:random.randint(1, 10)]
+                                           config['Clarifai']['model_version_id'])[0:random.randint(1, 3)]
+        print(tags)
         tags_set = set(tags)
         cats_set = set(cats)
-
-    if random.randint(0, 1) == 1:
-        print("Переводим теги")
-        tags = translate_tags(tags)
-    tags_tags = []
-    if random.randint(0, 1) == 1:
-        print("Добавляем хештег")
+    if random.randint(0,1)== 0:
+        if random.randint(0, 0) == 1:
+            print("Переводим теги")
+            tags = translate_tags(tags)
+            if tags =='[]':
+                tags = get_text_for_cats()
+            return pick_url, tags
+        tags_tags = []
+        if random.randint(0, 0) == 0:
+            print("Добавляем хештег")
+            for tag in tags:
+                tag = tag.replace(' ', '_')
+                tags_tags.append('#' + tag)
+                tags = ' '.join(tags_tags)
+            return pick_url, tags
         for tag in tags:
-            tag = tag.replace(' ', '_')
-            tags_tags.append('#' + tag)
+            tags_tags.append(tag + ';')
             tags = ' '.join(tags_tags)
-        if not tags:
-            tags = 'Бот старался сделать описание, но что-то пошло не так'
-        return pick_url, tags
-    for tag in tags:
-        tags_tags.append(tag + ';')
-        tags = ' '.join(tags_tags)
+    else:
+        tags = get_text_for_cats()
     return pick_url, tags
+
+
+def get_text_for_cats():
+    if random.randint(0,2)== 0:
+        with open('fack', 'r', encoding="utf8") as f:
+            text = f.readlines()
+            f.close()
+            return(random.choice(text)[1:-1])
+    else:
+        with open('emoji', 'r', encoding="utf8") as f:
+            text = f.read()
+            out = ''
+            if random.randint(0,1)== 0:
+                while len(out) < 3:
+                    data = random.choice(text)
+                    out += data
+            else:
+                data = random.choice(text)
+                out = data*3
+            f.close()
+            return(out)
 
 
 def get_interesting_pick_and_tags(config):
     pick_url = get_pic_from_flickr(config['Flickr']['interesting'], 9)
     tags = get_relevant_tags_from_pick(pick_url, config['Clarifai']['pat'], config['Clarifai']['user_id'],
                                        config['Clarifai']['app_id'], config['Clarifai']['model_id'],
-                                       config['Clarifai']['model_version_id'])[0:random.randint(1, 10)]
+                                       config['Clarifai']['model_version_id'])[0]
     if random.randint(0, 1) == 1:
         print("Переводим теги")
         tags = translate_tags(tags)
